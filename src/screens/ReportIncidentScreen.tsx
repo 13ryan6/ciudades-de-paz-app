@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -23,11 +23,27 @@ const CATEGORIAS: Categoria[] = [
 ];
 
 export default function ReportIncidentScreen({ navigation }: Props) {
+  const [checking, setChecking] = useState(true);
+  const [tieneFoto, setTieneFoto] = useState(true);
   const [tipo, setTipo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [fotoAdjunta, setFotoAdjunta] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) {
+        setChecking(false);
+        return;
+      }
+      const { data } = await supabase.from('profiles').select('foto_url').eq('id', user.id).single();
+      setTieneFoto(!!data?.foto_url);
+      setChecking(false);
+    })();
+  }, []);
 
   const canSubmit = tipo && descripcion.trim().length > 5;
 
@@ -63,6 +79,31 @@ export default function ReportIncidentScreen({ navigation }: Props) {
     }
     navigation.goBack();
   };
+
+  if (checking) {
+    return (
+      <View style={styles.flex}>
+        <ActivityIndicator color={TEAL} size="large" style={{ marginTop: 100 }} />
+      </View>
+    );
+  }
+
+  if (!tieneFoto) {
+    return (
+      <View style={styles.blockedContainer}>
+        <Text style={styles.blockedTitle}>Falta tu foto de perfil</Text>
+        <Text style={styles.blockedText}>
+          Para reportar incidencias primero debes subir una foto de perfil — es una medida para evitar reportes falsos.
+        </Text>
+        <Pressable
+          style={styles.submitButton}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Perfil' } as never)}
+        >
+          <Text style={styles.submitText}>Ir a mi perfil</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -165,4 +206,7 @@ const styles = StyleSheet.create({
   submitButton: { backgroundColor: AMBER, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   submitButtonDisabled: { opacity: 0.5 },
   submitText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  blockedContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#fff' },
+  blockedTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 10, textAlign: 'center' },
+  blockedText: { fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
 });

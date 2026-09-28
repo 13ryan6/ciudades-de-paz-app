@@ -18,21 +18,24 @@ export default function ActivitiesScreen({ navigation }: Props) {
   const [confirmadasIds, setConfirmadasIds] = useState<Set<string>>(new Set());
   const [reportesCount, setReportesCount] = useState(0);
   const [filtro, setFiltro] = useState<Filtro>('todas');
+  const [tieneFoto, setTieneFoto] = useState(true);
 
   const loadData = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
     if (!user) return;
 
-    const [actividadesRes, asistenciasRes, incidenciasRes] = await Promise.all([
+    const [actividadesRes, asistenciasRes, incidenciasRes, profileRes] = await Promise.all([
       supabase.from('actividades').select('id, titulo, fecha, organizacion').order('fecha', { ascending: true }),
       supabase.from('asistencias').select('actividad_id').eq('usuario_id', user.id),
       supabase.from('incidencias').select('id').eq('usuario_id', user.id),
+      supabase.from('profiles').select('foto_url').eq('id', user.id).single(),
     ]);
 
     if (actividadesRes.data) setActividades(actividadesRes.data as Actividad[]);
     if (asistenciasRes.data) setConfirmadasIds(new Set(asistenciasRes.data.map((a) => a.actividad_id)));
     setReportesCount(incidenciasRes.data?.length ?? 0);
+    setTieneFoto(!!profileRes.data?.foto_url);
   }, []);
 
   useFocusEffect(
@@ -72,11 +75,22 @@ export default function ActivitiesScreen({ navigation }: Props) {
         <Text style={styles.headerTitle}>Actividades</Text>
         <Pressable
           style={styles.reportButton}
-          onPress={() =>
+          onPress={() => {
+            if (!tieneFoto) {
+              Alert.alert(
+                'Falta tu foto de perfil',
+                'Para reportar incidencias primero debes subir una foto de perfil.',
+                [
+                  { text: 'Ir a mi perfil', onPress: () => navigation.navigate('Perfil') },
+                  { text: 'Cancelar', style: 'cancel' },
+                ]
+              );
+              return;
+            }
             navigation.getParent()
               ? navigation.getParent()!.navigate('ReportIncident' as never)
-              : Alert.alert('Próximo paso', 'Aquí abrirá el formulario de reporte de incidencia.')
-          }
+              : Alert.alert('Próximo paso', 'Aquí abrirá el formulario de reporte de incidencia.');
+          }}
         >
           <Text style={styles.reportButtonText}>+ Reportar</Text>
         </Pressable>
