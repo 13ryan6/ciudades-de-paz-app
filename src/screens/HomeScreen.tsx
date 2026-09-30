@@ -42,16 +42,19 @@ export default function HomeScreen({ navigation }: Props) {
     const user = userData?.user;
     if (!user) return;
 
-    const [profileRes, encuestasRes, incidenciasRes, actividadesRes] = await Promise.all([
+    const [profileRes, encuestasRes, incidenciasRes, actividadesRes, respuestasRes] = await Promise.all([
       supabase.from('profiles').select('nombre_completo, parroquia, canton, foto_url').eq('id', user.id).single(),
       supabase.from('encuestas').select('id, titulo, dimension, tiempo_estimado').eq('activa', true),
       supabase.from('incidencias').select('id').eq('usuario_id', user.id),
       supabase.from('actividades').select('id, titulo, fecha, organizacion').order('fecha', { ascending: true }),
+      supabase.from('respuestas_encuesta').select('encuesta_id').eq('usuario_id', user.id),
     ]);
 
     if (profileRes.data) setProfile(profileRes.data as Profile);
     if (encuestasRes.data) setEncuestas(encuestasRes.data as Encuesta[]);
-    setEncuestasCount(encuestasRes.data?.length ?? 0);
+    // Pendientes = encuestas activas que el usuario todavía no ha contestado
+    const contestadas = new Set((respuestasRes.data ?? []).map((r) => r.encuesta_id));
+    setEncuestasCount((encuestasRes.data ?? []).filter((e) => !contestadas.has(e.id)).length);
     setReportesCount(incidenciasRes.data?.length ?? 0);
     if (actividadesRes.data) setActividades(actividadesRes.data as Actividad[]);
   }, []);

@@ -19,10 +19,13 @@ export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
 
   const handleLogin = async () => {
     setError(null);
+    setResetMsg(null);
     if (!email || !password) {
       setError('Ingresa tu correo y contraseña.');
       return;
@@ -46,6 +49,30 @@ export default function LoginScreen({ navigation }: Props) {
     navigation.replace('MainTabs');
   };
 
+  // Envía el correo de recuperación al email escrito en el campo de arriba.
+  // Supabase manda un enlace para restablecer la contraseña — la app no
+  // maneja la contraseña nueva directamente, todo pasa por ese correo.
+  const handleForgotPassword = async () => {
+    setError(null);
+    setResetMsg(null);
+
+    // Sin el correo no sabemos a dónde enviar el enlace
+    if (!email.trim()) {
+      setError('Escribe tu correo arriba para enviarte el enlace de recuperación.');
+      return;
+    }
+
+    setLoadingReset(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+    setLoadingReset(false);
+
+    if (resetError) {
+      setError('No se pudo enviar el correo de recuperación. Intenta de nuevo.');
+      return;
+    }
+    setResetMsg('Te enviamos un enlace para restablecer tu contraseña. Revisa tu correo (y la carpeta de spam).');
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -56,7 +83,7 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.backText}>‹ Volver</Text>
         </Pressable>
 
-        <Text style={styles.title}>Iniciar sesión PRUEBA</Text>
+        <Text style={styles.title}>Iniciar sesión</Text>
         <Text style={styles.subtitle}>Ingresa con tu cuenta de Ciudadanía ICIPAZ.</Text>
 
         <Text style={styles.label}>Correo electrónico</Text>
@@ -81,9 +108,18 @@ export default function LoginScreen({ navigation }: Props) {
         />
 
         {error && <Text style={styles.error}>{error}</Text>}
+        {resetMsg && <Text style={styles.success}>{resetMsg}</Text>}
 
-        <Pressable style={styles.forgotLink}>
-          <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+        <Pressable
+          style={styles.forgotLink}
+          onPress={handleForgotPassword}
+          disabled={loadingReset}
+        >
+          {loadingReset ? (
+            <ActivityIndicator color={TEAL} size="small" />
+          ) : (
+            <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+          )}
         </Pressable>
 
         <Pressable
@@ -124,7 +160,8 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   error: { color: '#dc2626', fontSize: 13, marginBottom: 10 },
-  forgotLink: { alignSelf: 'flex-end', marginBottom: 24 },
+  success: { color: '#065f46', fontSize: 13, marginBottom: 10 },
+  forgotLink: { alignSelf: 'flex-end', marginBottom: 24, minHeight: 20, justifyContent: 'center' },
   forgotText: { fontSize: 13, color: TEAL, fontWeight: '500' },
   button: {
     backgroundColor: TEAL,

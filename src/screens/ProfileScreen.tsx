@@ -68,7 +68,7 @@ export default function ProfileScreen() {
         .upload(path, arraybuffer, { contentType, upsert: true });
 
       if (uploadError) {
-        Alert.alert('No se pudo subir la foto', uploadError.message);
+        Alert.alert('No se pudo subir la foto', 'Intenta de nuevo.');
         return;
       }
 
@@ -118,11 +118,14 @@ export default function ProfileScreen() {
       Alert.alert('Permiso necesario', 'Activa el acceso a la cámara en los ajustes del teléfono.');
       return;
     }
-    const resultado = await ImagePicker.launchCameraAsync({
+    // DESPUÉS:
+    const resultado = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.6,
     });
+    
     if (!resultado.canceled && resultado.assets[0]) {
       await subirFoto(resultado.assets[0]);
     }

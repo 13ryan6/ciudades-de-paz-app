@@ -34,6 +34,12 @@
           "photosPermission": "La app necesita acceso a tus fotos para que subas tu foto de perfil o de una incidencia.",
           "cameraPermission": "La app necesita acceso a tu cámara para que tomes tu foto de perfil o de una incidencia."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "La app necesita tu ubicación para georreferenciar tus reportes de incidencias y respuestas de encuestas."
+        }
       ]
     ]
   }

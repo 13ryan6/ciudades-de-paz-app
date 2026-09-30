@@ -2,8 +2,10 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Image, Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 
@@ -27,7 +29,7 @@ export default function ReportIncidentScreen({ navigation }: Props) {
   const [tieneFoto, setTieneFoto] = useState(true);
   const [tipo, setTipo] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [fotoAdjunta, setFotoAdjunta] = useState(false);
+  const [fotoAsset, setFotoAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +49,66 @@ export default function ReportIncidentScreen({ navigation }: Props) {
 
   const canSubmit = tipo && descripcion.trim().length > 5;
 
+  const elegirDeGaleria = async () => {
+    const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permiso.granted) {
+      Alert.alert('Permiso necesario', 'Activa el acceso a tus fotos en los ajustes del teléfono.');
+      return;
+    }
+    const resultado = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.6,
+    });
+    if (!resultado.canceled && resultado.assets[0]) {
+      setFotoAsset(resultado.assets[0]);
+    }
+  };
+
+  const tomarFoto = async () => {
+    const permiso = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permiso.granted) {
+      Alert.alert('Permiso necesario', 'Activa el acceso a la cámara en los ajustes del teléfono.');
+      return;
+    }
+    const resultado = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.6,
+    });
+    if (!resultado.canceled && resultado.assets[0]) {
+      setFotoAsset(resultado.assets[0]);
+    }
+  };
+
+  const handleAdjuntarFoto = () => {
+    Alert.alert('Foto de la incidencia', '¿Cómo quieres agregar la foto?', [
+      { text: 'Tomar foto', onPress: tomarFoto },
+      { text: 'Elegir de galería', onPress: elegirDeGaleria },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  };
+
+  // Sube la foto al bucket privado "incidencias" y devuelve la ruta guardada
+  // (no una URL pública, porque el bucket es privado).
+  const subirFotoIncidencia = async (userId: string): Promise<string | null> => {
+    if (!fotoAsset) return null;
+    const ext = fotoAsset.mimeType?.includes('png') ? 'png' : 'jpg';
+    const contentType = fotoAsset.mimeType ?? 'image/jpeg';
+    const path = `${userId}/${Date.now()}.${ext}`;
+
+    const response = await fetch(fotoAsset.uri);
+    const arraybuffer = await response.arrayBuffer();
+
+    const { error: uploadError } = await supabase.storage
+      .from('incidencias')
+      .upload(path, arraybuffer, { contentType, upsert: false });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+    return path;
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (!canSubmit) {
@@ -62,6 +124,17 @@ export default function ReportIncidentScreen({ navigation }: Props) {
       return;
     }
 
+    let fotoPath: string | null = null;
+    if (fotoAsset) {
+      try {
+        fotoPath = await subirFotoIncidencia(user.id);
+      } catch (e) {
+        setLoading(false);
+        setError('No se pudo subir la foto de la incidencia. Intenta de nuevo.');
+        return;
+      }
+    }
+
     const { error: insertError } = await supabase.from('incidencias').insert({
       usuario_id: user.id,
       tipo,
@@ -70,6 +143,7 @@ export default function ReportIncidentScreen({ navigation }: Props) {
       estado: 'pendiente',
       latitud: -2.9006,
       longitud: -79.0045,
+      foto_url: fotoPath,
     });
 
     setLoading(false);
@@ -144,12 +218,14 @@ export default function ReportIncidentScreen({ navigation }: Props) {
           onChangeText={setDescripcion}
         />
 
+        {fotoAsset && <Image source={{ uri: fotoAsset.uri }} style={styles.photoPreview} />}
+
         <Pressable
-          style={[styles.photoButton, fotoAdjunta && styles.photoButtonActive]}
-          onPress={() => setFotoAdjunta(!fotoAdjunta)}
+          style={[styles.photoButton, fotoAsset && styles.photoButtonActive]}
+          onPress={handleAdjuntarFoto}
         >
-          <Text style={[styles.photoButtonText, fotoAdjunta && styles.photoButtonTextActive]}>
-            {fotoAdjunta ? '✓ Foto adjuntada' : 'Adjuntar foto'}
+          <Text style={[styles.photoButtonText, fotoAsset && styles.photoButtonTextActive]}>
+            {fotoAsset ? '✓ Foto adjuntada · Cambiar' : 'Adjuntar foto'}
           </Text>
         </Pressable>
 
@@ -192,6 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14,
     fontSize: 14, color: '#111827', textAlignVertical: 'top', minHeight: 90, marginBottom: 14,
   },
+  photoPreview: { width: '100%', height: 160, borderRadius: 12, marginBottom: 10, backgroundColor: '#f3f4f6' },
   photoButton: {
     borderWidth: 1, borderColor: '#e5e7eb', borderStyle: 'dashed', borderRadius: 12,
     paddingVertical: 12, alignItems: 'center', marginBottom: 14,
