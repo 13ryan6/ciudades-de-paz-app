@@ -171,12 +171,7 @@ export default function LoginScreen({ navigation }: Props) {
           )}
         </Pressable>
 
-        <View style={styles.registerRow}>
-          <Text style={styles.registerText}>¿No tienes cuenta? </Text>
-          <Pressable onPress={() => navigation.navigate('Register')} hitSlop={8}>
-            <Text style={styles.registerLink}>Regístrate aquí</Text>
-          </Pressable>
-        </View>
+        
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -260,7 +255,5 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
-  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 26 },
-  registerText: { fontSize: 13.5, color: colors.textSecondary },
-  registerLink: { fontSize: 13.5, color: colors.accent, fontWeight: '700' },
+  
 });
