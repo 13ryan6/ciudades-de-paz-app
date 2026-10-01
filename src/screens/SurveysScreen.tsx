@@ -1,7 +1,10 @@
 import { useCallback, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert, StatusBar } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { colors, radius, shadow } from '../constants/theme';
 
 type Encuesta = {
   id: string;
@@ -13,10 +16,8 @@ type Encuesta = {
 
 type Filtro = 'todos' | 'pendiente' | 'completada';
 
-const TEAL = '#0f766e';
-const AMBER = '#d97706';
-
 export default function SurveysScreen() {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [encuestas, setEncuestas] = useState<Encuesta[]>([]);
   const [completadasIds, setCompletadasIds] = useState<Set<string>>(new Set());
@@ -52,18 +53,27 @@ export default function SurveysScreen() {
     return true;
   });
 
+  const pendientesCount = encuestas.filter((e) => !completadasIds.has(e.id)).length;
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator color={TEAL} size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
 
   return (
     <View style={styles.flex}>
-      <View style={styles.header}>
+      <StatusBar barStyle="dark-content" />
+
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>Encuestas</Text>
+        <Text style={styles.headerSubtitle}>
+          {pendientesCount === 0
+            ? 'Has contestado todas las encuestas activas 🎉'
+            : `Tienes ${pendientesCount} encuesta${pendientesCount !== 1 ? 's' : ''} por contestar`}
+        </Text>
       </View>
 
       <View style={styles.filterRow}>
@@ -80,33 +90,48 @@ export default function SurveysScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.list}>
+      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         {encuestasFiltradas.length === 0 ? (
-          <Text style={styles.emptyText}>No hay encuestas en esta categoría.</Text>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="clipboard-outline" size={30} color={colors.textMuted} />
+            </View>
+            <Text style={styles.emptyText}>No hay encuestas en esta categoría.</Text>
+          </View>
         ) : (
           encuestasFiltradas.map((e) => {
             const completada = completadasIds.has(e.id);
             return (
               <Pressable
                 key={e.id}
-                style={styles.card}
+                style={({ pressed }) => [styles.card, pressed && !completada && styles.cardPressed]}
                 onPress={() =>
                   completada
                     ? null
                     : Alert.alert('Próximo paso', 'Aquí abrirá el formulario de la encuesta.')
                 }
               >
-                <View style={styles.cardTop}>
+                <View style={[styles.cardIconWrap, completada && styles.cardIconWrapDone]}>
+                  <Ionicons
+                    name={completada ? 'checkmark-circle' : 'clipboard'}
+                    size={20}
+                    color={completada ? colors.success : colors.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>{e.titulo}</Text>
-                  <View style={[styles.statusPill, completada ? styles.statusDone : styles.statusPending]}>
-                    <Text style={[styles.statusText, completada ? styles.statusTextDone : styles.statusTextPending]}>
-                      {completada ? 'Completada' : 'Pendiente'}
-                    </Text>
+                  <View style={styles.cardMetaRow}>
+                    <Ionicons name="location-outline" size={11} color={colors.textMuted} />
+                    <Text style={styles.cardMeta}>{e.territorio}</Text>
+                    <Ionicons name="time-outline" size={11} color={colors.textMuted} style={{ marginLeft: 8 }} />
+                    <Text style={styles.cardMeta}>{e.tiempo_estimado}</Text>
                   </View>
                 </View>
-                <Text style={styles.cardMeta}>
-                  {e.territorio} · {e.tiempo_estimado} 
-                </Text>
+                <View style={[styles.statusPill, completada ? styles.statusDone : styles.statusPending]}>
+                  <Text style={[styles.statusText, completada ? styles.statusTextDone : styles.statusTextPending]}>
+                    {completada ? 'Completada' : 'Pendiente'}
+                  </Text>
+                </View>
               </Pressable>
             );
           })
@@ -117,28 +142,68 @@ export default function SurveysScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#f9fafb' },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  header: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, backgroundColor: '#fff' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#111827' },
-  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#fff' },
-  filterPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#f3f4f6' },
-  filterPillActive: { backgroundColor: TEAL },
-  filterText: { fontSize: 12.5, color: '#6b7280', fontWeight: '500' },
-  filterTextActive: { color: '#fff' },
-  list: { padding: 20, paddingTop: 14 },
-  emptyText: { fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 20 },
-  card: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10,
-    borderWidth: 1, borderColor: '#f3f4f6',
+  flex: { flex: 1, backgroundColor: colors.background },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+
+  header: { paddingHorizontal: 24, paddingBottom: 14, backgroundColor: colors.background },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: colors.text },
+  headerSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+
+  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 24, paddingBottom: 14 },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    backgroundColor: colors.card,
+    ...shadow,
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
-  cardTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' },
-  cardMeta: { fontSize: 11.5, color: '#9ca3af', marginTop: 8 },
-  statusPill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  statusPending: { backgroundColor: '#fef3c7' },
-  statusDone: { backgroundColor: '#d1fae5' },
+  filterPillActive: { backgroundColor: colors.primary },
+  filterText: { fontSize: 12.5, color: colors.textSecondary, fontWeight: '600' },
+  filterTextActive: { color: '#fff' },
+
+  list: { paddingHorizontal: 20, paddingBottom: 24 },
+
+  emptyState: { alignItems: 'center', marginTop: 60 },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    ...shadow,
+  },
+  emptyText: { fontSize: 13.5, color: colors.textMuted },
+
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 16,
+    marginBottom: 10,
+    ...shadow,
+  },
+  cardPressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
+  cardIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardIconWrapDone: { backgroundColor: colors.successSoft },
+  cardTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
+  cardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
+  cardMeta: { fontSize: 11.5, color: colors.textMuted },
+
+  statusPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
+  statusPending: { backgroundColor: colors.accentSoft },
+  statusDone: { backgroundColor: colors.successSoft },
   statusText: { fontSize: 10.5, fontWeight: '700' },
   statusTextPending: { color: '#92400e' },
-  statusTextDone: { color: '#065f46' },
+  statusTextDone: { color: colors.success },
 });

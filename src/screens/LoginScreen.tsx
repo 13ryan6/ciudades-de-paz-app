@@ -9,15 +9,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
+import { colors, radius, shadow, shadowStrong, spacing } from '../constants/theme';
 
 type Props = NativeStackScreenProps<any>;
 
 export default function LoginScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verPassword, setVerPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingReset, setLoadingReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,14 +55,11 @@ export default function LoginScreen({ navigation }: Props) {
     navigation.replace('MainTabs');
   };
 
-  // Envía el correo de recuperación al email escrito en el campo de arriba.
-  // Supabase manda un enlace para restablecer la contraseña — la app no
-  // maneja la contraseña nueva directamente, todo pasa por ese correo.
+  // Envía el correo de recuperación al email escrito en el campo de arriba
   const handleForgotPassword = async () => {
     setError(null);
     setResetMsg(null);
 
-    // Sin el correo no sabemos a dónde enviar el enlace
     if (!email.trim()) {
       setError('Escribe tu correo arriba para enviarte el enlace de recuperación.');
       return;
@@ -78,37 +81,71 @@ export default function LoginScreen({ navigation }: Props) {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Volver</Text>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingTop: insets.top + 16 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={8}>
+          <Ionicons name="arrow-back" size={20} color={colors.primary} />
+          <Text style={styles.backText}>Volver</Text>
         </Pressable>
 
-        <Text style={styles.title}>Iniciar sesión</Text>
-        <Text style={styles.subtitle}>Ingresa con tu cuenta de Ciudadanía ICIPAZ.</Text>
+        <View style={styles.headerBlock}>
+          <View style={styles.headerIconWrap}>
+            <Ionicons name="person" size={26} color={colors.primary} />
+          </View>
+          <Text style={styles.title}>Bienvenido de nuevo</Text>
+          <Text style={styles.subtitle}>Ingresa con tu cuenta de Ciudadanía ICIPAZ.</Text>
+        </View>
 
         <Text style={styles.label}>Correo electrónico</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="tú@correo.com"
-          placeholderTextColor="#9ca3af"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
+        <View style={styles.inputWrap}>
+          <Ionicons name="mail-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="tú@correo.com"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+        </View>
 
         <Text style={styles.label}>Contraseña</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          placeholderTextColor="#9ca3af"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.inputWrap}>
+          <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="••••••••"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry={!verPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Pressable onPress={() => setVerPassword(!verPassword)} hitSlop={8}>
+            <Ionicons
+              name={verPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={18}
+              color={colors.textMuted}
+            />
+          </Pressable>
+        </View>
 
-        {error && <Text style={styles.error}>{error}</Text>}
-        {resetMsg && <Text style={styles.success}>{resetMsg}</Text>}
+        {error && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={15} color={colors.error} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+        {resetMsg && (
+          <View style={styles.successBox}>
+            <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+            <Text style={styles.successText}>{resetMsg}</Text>
+          </View>
+        )}
 
         <Pressable
           style={styles.forgotLink}
@@ -116,14 +153,14 @@ export default function LoginScreen({ navigation }: Props) {
           disabled={loadingReset}
         >
           {loadingReset ? (
-            <ActivityIndicator color={TEAL} size="small" />
+            <ActivityIndicator color={colors.primary} size="small" />
           ) : (
             <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
           )}
         </Pressable>
 
         <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={({ pressed }) => [styles.button, (loading || pressed) && styles.buttonPressed]}
           onPress={handleLogin}
           disabled={loading}
         >
@@ -133,46 +170,97 @@ export default function LoginScreen({ navigation }: Props) {
             <Text style={styles.buttonText}>Iniciar sesión</Text>
           )}
         </Pressable>
+
+        <View style={styles.registerRow}>
+          <Text style={styles.registerText}>¿No tienes cuenta? </Text>
+          <Pressable onPress={() => navigation.navigate('Register')} hitSlop={8}>
+            <Text style={styles.registerLink}>Regístrate aquí</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const TEAL = '#0f766e';
-const AMBER = '#d97706';
-
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#fff' },
-  container: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 24 },
-  backButton: { marginBottom: 12 },
-  backText: { color: TEAL, fontSize: 14, fontWeight: '500' },
-  title: { fontSize: 22, fontWeight: '600', color: '#111827' },
-  subtitle: { fontSize: 13, color: '#6b7280', marginTop: 4, marginBottom: 28 },
-  label: { fontSize: 13, fontWeight: '500', color: '#4b5563', marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    marginBottom: 14,
-    color: '#111827',
+  flex: { flex: 1, backgroundColor: colors.background },
+  container: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
   },
-  error: { color: '#dc2626', fontSize: 13, marginBottom: 10 },
-  success: { color: '#065f46', fontSize: 13, marginBottom: 10 },
-  forgotLink: { alignSelf: 'flex-end', marginBottom: 24, minHeight: 20, justifyContent: 'center' },
-  forgotText: { fontSize: 13, color: TEAL, fontWeight: '500' },
-  button: {
-    backgroundColor: TEAL,
-    borderRadius: 12,
-    paddingVertical: 14,
+  backText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+
+  headerBlock: { alignItems: 'center', marginTop: 24, marginBottom: 32 },
+  headerIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 18,
   },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
-  registerText: { fontSize: 13, color: '#6b7280' },
-  registerLink: { fontSize: 13, color: AMBER, fontWeight: '600' },
+  title: { fontSize: 24, fontWeight: '800', color: colors.text },
+  subtitle: { fontSize: 13.5, color: colors.textSecondary, marginTop: 6, textAlign: 'center' },
+
+  label: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    marginBottom: 18,
+    ...shadow,
+  },
+  inputIcon: { marginRight: 10 },
+  input: {
+    flex: 1,
+    paddingVertical: 15,
+    fontSize: 15,
+    color: colors.text,
+  },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.errorSoft,
+    borderRadius: radius.sm,
+    padding: 12,
+    marginBottom: 14,
+  },
+  errorText: { flex: 1, color: colors.error, fontSize: 13, lineHeight: 18 },
+  successBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.sm,
+    padding: 12,
+    marginBottom: 14,
+  },
+  successText: { flex: 1, color: colors.success, fontSize: 13, lineHeight: 18 },
+
+  forgotLink: { alignSelf: 'flex-end', marginBottom: 26, minHeight: 20, justifyContent: 'center' },
+  forgotText: { fontSize: 13.5, color: colors.primary, fontWeight: '700' },
+
+  button: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadowStrong,
+  },
+  buttonPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 26 },
+  registerText: { fontSize: 13.5, color: colors.textSecondary },
+  registerLink: { fontSize: 13.5, color: colors.accent, fontWeight: '700' },
 });
